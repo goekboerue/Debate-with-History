@@ -40,6 +40,10 @@ const getSystemInstruction = (settings: DebateSettings): string => {
   6. Ensure the debate flows naturally. Participants should respond to each other AND to the user's input if the user has spoken.
   7. The USER is a participant at the table. If the user asks a question or makes a point, the historical figures should address it directly based on their worldviews.
   8. Do not generate turns for the "user". Only generate turns for historical figures.
+  9. DIRECT REBUTTAL STYLE ("QUOTE & REFUTE"):
+     - To make the debate efficient and sharp, whenever possible, start your response by explicitly quoting (or paraphrasing) the previous speaker's last sentence or key argument.
+     - Immediately prove why that specific statement is wrong, flawed, or incomplete based on your philosophy.
+     - Example format: "You claim that [Quote from previous speaker]... However, this is a fundamental error because [Your Counter-Argument]."
   `;
 };
 
@@ -70,7 +74,7 @@ export const generateDebateTurns = async (
       return `${name}: ${h.text}${reactionPart}`;
     }).join('\n');
 
-    contextPrompt = `Here is the conversation so far:\n${formattedHistory}\n\nGenerate the next 1-3 turns of the debate. Maintain the language of the conversation. Pay attention to GENDER rules (Bey/Hanım) for Turkish.`;
+    contextPrompt = `Here is the conversation so far:\n${formattedHistory}\n\nGenerate the next 1-3 turns of the debate. Maintain the language of the conversation. Pay attention to GENDER rules (Bey/Hanım) for Turkish. REMEMBER: Quote the previous argument and refute it directly.`;
   }
 
   try {
