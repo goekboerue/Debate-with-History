@@ -111,6 +111,67 @@ export const generateDebateTurns = async (
   }
 };
 
+// --- Summary Generation ---
+
+export const generateDebateSummary = async (
+  settings: DebateSettings,
+  history: ChatMessage[]
+): Promise<string> => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) throw new Error("API Key missing");
+
+  const ai = new GoogleGenAI({ apiKey });
+  
+  const formattedHistory = history.map(h => {
+    const name = h.speakerId === 'user' ? 'User' : settings.participants.find(p => p.id === h.speakerId)?.name || h.speakerId;
+    return `${name}: ${h.text}`;
+  }).join('\n');
+
+  const prompt = `
+    Analyze the following debate transcript about "${settings.topic}".
+    
+    Create a concise, engaging, shareable summary suitable for social media (Twitter/Instagram/WhatsApp).
+    
+    The output MUST be in the same language as the debate content (Turkish if Turkish, English if English).
+    
+    Structure the response exactly like this (use emojis):
+    
+    📜 *[Topic Name]* - Debate Summary
+    
+    🧠 *Core Conflict:* 
+    [1 sentence describing the main clash of ideas]
+    
+    🔥 *Key Arguments:*
+    • [Name]: [Brief summary of their stance]
+    • [Name]: [Brief summary of their stance]
+    (Include the User if they made significant points)
+    
+    💎 *Best Quote:*
+    "[Quote text]" - [Name]
+    
+    🏁 *Conclusion:*
+    [A witty or insightful concluding remark about where the debate landed]
+    
+    #DebateWithHistory #AI
+    
+    Transcript:
+    ${formattedHistory}
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+
+    return response.text || "Could not generate summary.";
+  } catch (error) {
+    console.error("Summary Generation Error:", error);
+    return "Summary generation failed. Please try again.";
+  }
+};
+
+
 // --- TTS Helper Functions ---
 
 function decode(base64: string) {

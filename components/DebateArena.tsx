@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { ChatMessage, DebateSettings, HistoricalFigure } from '../types';
-import { generateSpeech } from '../services/geminiService';
+import { generateSpeech, generateDebateSummary } from '../services/geminiService';
 
 interface DebateArenaProps {
   settings: DebateSettings;
@@ -42,6 +42,15 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  
+  // Summary/Share State
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
+  const [summaryText, setSummaryText] = useState<string>('');
+  const [showToast, setShowToast] = useState(false);
+
+  // Manual Focus State (Clicking avatars)
+  const [manualFocusId, setManualFocusId] = useState<string | null>(null);
   
   // Refs for State in Callbacks
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -236,6 +245,32 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
     }
   };
 
+  const handleOpenSummary = async () => {
+    setShowSummaryModal(true);
+    // Only generate if we haven't already or if messages changed significantly (simplified here to just check if empty)
+    if (!summaryText) {
+      setIsGeneratingSummary(true);
+      try {
+        const summary = await generateDebateSummary(settings, messages);
+        setSummaryText(summary);
+      } catch (e) {
+        setSummaryText("Error generating summary. Please try again.");
+      } finally {
+        setIsGeneratingSummary(false);
+      }
+    }
+  };
+
+  const handleCopySummary = async () => {
+    try {
+      await navigator.clipboard.writeText(summaryText);
+      setShowToast(true);
+      setTimeout(() => setShowToast(false), 3000);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
+  };
+
   // Determine who is currently SPEAKING (Audio)
   const currentAudioSpeakerId = playingMsgId 
     ? messages.find(m => m.id === playingMsgId)?.speakerId 
@@ -244,8 +279,9 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   // Determine who is visually active (Last text message if no audio)
   const activeTextSpeakerId = messages.length > 0 ? messages[messages.length - 1].speakerId : null;
   
-  // The figure to highlight is the audio speaker if playing, otherwise the last texter
-  const visualFocusId = currentAudioSpeakerId || activeTextSpeakerId;
+  // The figure to highlight is the audio speaker if playing, otherwise the last texter OR manual selection
+  // Manual selection takes precedence for visual focus (scale/color), but audio indicators remain on speaker
+  const visualFocusId = manualFocusId || currentAudioSpeakerId || activeTextSpeakerId;
 
   // Calculate positions for round table
   const participants = settings.participants;
@@ -272,31 +308,47 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
         <div className="flex items-center gap-4 min-w-0">
           <h2 className="text-xl font-serif text-amber-500 truncate">{settings.topic}</h2>
           
-          {/* Global Play Button */}
-          {messages.length > 0 && (
-            <button 
-              onClick={toggleAutoPlay}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
-                isAutoPlaying 
-                ? 'bg-amber-500/20 text-amber-500 border border-amber-500/50 animate-pulse' 
-                : 'bg-neutral-800 text-gray-400 hover:text-white border border-neutral-700'
-              }`}
-            >
-              {isAutoPlaying ? (
-                <>
-                  <span className="w-2 h-2 bg-amber-500 rounded-full animate-bounce"></span>
-                  Listening...
-                </>
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
-                  </svg>
-                  {autoPlayIndexRef.current > -1 && autoPlayIndexRef.current < messages.length - 1 ? 'Resume' : 'Listen Debate'}
-                </>
-              )}
-            </button>
-          )}
+          <div className="flex gap-2">
+            {/* Global Play Button */}
+            {messages.length > 0 && (
+              <button 
+                onClick={toggleAutoPlay}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider transition-all ${
+                  isAutoPlaying 
+                  ? 'bg-amber-500/20 text-amber-500 border border-amber-500/50 animate-pulse' 
+                  : 'bg-neutral-800 text-gray-400 hover:text-white border border-neutral-700'
+                }`}
+              >
+                {isAutoPlaying ? (
+                  <>
+                    <span className="w-2 h-2 bg-amber-500 rounded-full animate-bounce"></span>
+                    Listening...
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                    </svg>
+                    {autoPlayIndexRef.current > -1 && autoPlayIndexRef.current < messages.length - 1 ? 'Resume' : 'Listen'}
+                  </>
+                )}
+              </button>
+            )}
+
+            {/* Analyze & Share Button */}
+            {messages.length > 0 && (
+               <button 
+                 onClick={handleOpenSummary}
+                 className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-900/40 text-indigo-300 hover:bg-indigo-800/60 border border-indigo-500/30 transition-all shadow-sm"
+                 title="Generate a smart summary for sharing"
+               >
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                 </svg>
+                 Analyze & Share
+               </button>
+            )}
+          </div>
         </div>
 
         <button onClick={onRestart} className="text-xs text-gray-500 hover:text-white uppercase tracking-widest ml-4 whitespace-nowrap">
@@ -307,7 +359,10 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         
         {/* Visual Stage */}
-        <div className="flex-1 bg-[#121212] relative flex items-center justify-center min-h-[300px] md:min-h-auto order-1 md:order-1">
+        <div 
+          className="flex-1 bg-[#121212] relative flex items-center justify-center min-h-[300px] md:min-h-auto order-1 md:order-1"
+          onClick={() => setManualFocusId(null)} // Clicking background clears selection
+        >
           <div className="absolute inset-0 opacity-10 pointer-events-none" 
                style={{ backgroundImage: 'radial-gradient(circle at center, #444 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
 
@@ -323,17 +378,16 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
             {participants.map((participant, index) => {
               const pos = getPosition(index, participants.length);
               
-              // Visual focus logic: 
-              // If audio is playing, ONLY focus the speaker.
-              // If silence, focus the last person who texted.
               const isSpeakingAudio = currentAudioSpeakerId === participant.id;
               const hasFocus = visualFocusId === participant.id;
+              const isManualFocus = manualFocusId === participant.id;
               const quoteIndex = quoteIndices[participant.id] || 0;
               
               return (
                 <div 
                   key={participant.id}
-                  className={`absolute transition-all duration-500 ease-out flex flex-col items-center justify-center w-24 h-24 md:w-32 md:h-32 transform -translate-x-1/2 -translate-y-1/2`}
+                  onClick={(e) => { e.stopPropagation(); setManualFocusId(isManualFocus ? null : participant.id); }}
+                  className={`absolute transition-all duration-500 ease-out flex flex-col items-center justify-center w-24 h-24 md:w-32 md:h-32 transform -translate-x-1/2 -translate-y-1/2 cursor-pointer z-10 hover:z-20`}
                   style={{ 
                     left: `calc(50% + ${pos.x}px)`, 
                     top: `calc(50% + ${pos.y}px)`,
@@ -344,15 +398,36 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
                     
                     {/* Floating Speech Bubble for Audio Speaker */}
                     {isSpeakingAudio && (
-                      <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-white text-black px-3 py-1 rounded-xl rounded-bl-none shadow-lg animate-bounce z-40 whitespace-nowrap flex items-center gap-1">
+                      <div className="absolute -top-12 left-1/2 transform -translate-x-1/2 bg-white text-black px-3 py-1 rounded-xl rounded-bl-none shadow-lg animate-bounce z-40 whitespace-nowrap flex items-center gap-1 pointer-events-none">
                          <span className="w-1.5 h-1.5 bg-black rounded-full animate-pulse"></span>
                          <span className="w-1.5 h-1.5 bg-black rounded-full animate-pulse delay-75"></span>
                          <span className="w-1.5 h-1.5 bg-black rounded-full animate-pulse delay-150"></span>
                       </div>
                     )}
 
-                    {/* Character Quote Bubble (Only if focussed and not showing generic speech dots) */}
-                    {hasFocus && !isSpeakingAudio && participant.quotes.length > 0 && (
+                    {/* BIO POPUP (Manual Focus) */}
+                    {isManualFocus && (
+                      <div className="absolute -top-32 left-1/2 transform -translate-x-1/2 w-64 bg-neutral-900/95 backdrop-blur-md border border-amber-500/50 text-white p-4 rounded-xl shadow-2xl z-[60] text-center animate-fade-in cursor-auto" onClick={(e) => e.stopPropagation()}>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setManualFocusId(null); }}
+                            className="absolute top-2 right-2 text-gray-500 hover:text-white"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                          </button>
+                          <h4 className="font-serif font-bold text-amber-500 text-lg mb-0.5">{participant.name}</h4>
+                          <div className="text-[10px] uppercase tracking-widest text-gray-400 mb-3 border-b border-gray-800 pb-2">{participant.era}</div>
+                          
+                          <p className="text-xs text-amber-200/80 mb-2 italic font-serif">"{participant.philosophy}"</p>
+                          <p className="text-xs text-gray-300 leading-relaxed">{participant.description}</p>
+                          
+                          <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-neutral-900 border-r border-b border-amber-500/50 rotate-45"></div>
+                      </div>
+                    )}
+
+                    {/* Character Quote Bubble (Only if focussed and not showing generic speech dots AND not manually focused) */}
+                    {hasFocus && !isManualFocus && !isSpeakingAudio && participant.quotes.length > 0 && (
                        <div className="absolute -top-24 left-1/2 transform -translate-x-1/2 w-48 bg-neutral-800/90 backdrop-blur-sm border border-amber-500/30 text-amber-100 p-3 rounded-lg shadow-xl z-50 text-center animate-fade-in pointer-events-none">
                           <p className="text-[10px] md:text-xs font-serif italic leading-tight">
                             "{participant.quotes[quoteIndex]}"
@@ -535,8 +610,58 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
              </div>
           </div>
         </div>
-
       </div>
+
+      {/* Summary Modal */}
+      {showSummaryModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-neutral-900 border border-neutral-700 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-950">
+              <h3 className="font-serif text-amber-500 text-lg">Debate Analysis</h3>
+              <button onClick={() => setShowSummaryModal(false)} className="text-gray-500 hover:text-white">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1 custom-scrollbar">
+              {isGeneratingSummary ? (
+                <div className="flex flex-col items-center justify-center py-12 space-y-4">
+                  <div className="w-12 h-12 border-4 border-amber-500/30 border-t-amber-500 rounded-full animate-spin"></div>
+                  <p className="text-gray-400 animate-pulse text-sm">Consulting the archives...</p>
+                </div>
+              ) : (
+                <pre className="whitespace-pre-wrap font-sans text-sm md:text-base text-gray-200 leading-relaxed">
+                  {summaryText}
+                </pre>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-neutral-800 bg-neutral-950 flex gap-3">
+              <button 
+                onClick={handleCopySummary}
+                disabled={isGeneratingSummary}
+                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white py-2.5 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                </svg>
+                Copy Summary
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Toast Notification */}
+      <div className={`fixed bottom-8 left-1/2 transform -translate-x-1/2 bg-neutral-800 border border-amber-500/50 text-white px-4 py-2 rounded-full shadow-2xl flex items-center gap-2 transition-all duration-300 z-[70] ${showToast ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}>
+         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+         </svg>
+         <span className="text-sm font-medium">Summary copied!</span>
+      </div>
+
     </div>
   );
 };
