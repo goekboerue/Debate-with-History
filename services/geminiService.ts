@@ -6,54 +6,87 @@ const getSystemInstruction = (settings: DebateSettings): string => {
   const shuffledParticipants = [...settings.participants].sort(() => Math.random() - 0.5);
 
   const participantsList = shuffledParticipants.map(p => 
-    `${p.name} [Gender: ${p.gender}] (ID: ${p.id}) (Philosophy: ${p.philosophy}, Personality: ${p.description})`
-  ).join('\n');
+    `ID: ${p.id}
+     Name: ${p.name}
+     Description: ${p.description}
+     Philosophy: ${p.philosophy}
+     Acceptable Titles (Honorifics): [${p.titles.join(', ')}]`
+  ).join('\n\n');
 
   return `You are a simulator for an educational app called "Debate with History".
   
   Current Topic: "${settings.topic}"
   Target Audience: ${settings.ageGroup}
   
-  Your goal is to simulate a round-table discussion between the following historical figures AND a modern human user (identified as "user").
+  Your goal is to simulate a FIERCE, HIGH-STAKES round-table discussion between the following historical figures AND a modern human user (identified as "user").
   
-  Participants:
+  Participants Data:
   ${participantsList}
   
   User Info:
   - Gender: ${settings.userGender === 'male' ? 'Male' : settings.userGender === 'female' ? 'Female' : 'Unknown/Neutral'}
   
-  Rules:
-  1. Stay strictly in character for historical figures. 
-     - Socrates should ask probing questions.
-     - Marx should focus on material conditions and power.
-     - Atatürk should focus on reason, science, and national/human progress.
-     - Others should adhere to their defined philosophies.
-  2. LANGUAGE ADAPTATION: The debate MUST be conducted in the language of the "Current Topic" or the user's input. 
-     - If the topic is Turkish (e.g., "Yapay Zeka"), speak TURKISH.
-     - If the user writes in Turkish, speak TURKISH.
-     - If the topic is English, speak ENGLISH.
-  3. HONORIFICS & GENDER (Crucial for Turkish):
-     - You MUST address participants correctly based on their [Gender].
-     - In Turkish: Use "Bey" for Male (e.g. "Socrates Bey", "Mustafa Kemal Bey").
-     - In Turkish: Use "Hanım" for Female (e.g. "Simone Hanım", "Marie Hanım").
-     - Address the USER based on their gender setting (Bey/Hanım) if known. If 'silent' or unknown, use neutral or polite language without specific gendered honorifics unless clear.
-     - Do not address a Female character as "Bey".
-  4. The language complexity should be appropriate for the "${settings.ageGroup}" audience.
-  5. Respond in JSON format as an array of dialogue turns.
-  6. Ensure the debate flows naturally. Participants should respond to each other AND to the user's input if the user has spoken.
-  7. The USER is a participant at the table. If the user asks a question or makes a point, the historical figures should address it directly based on their worldviews.
-  8. Do not generate turns for the "user". Only generate turns for historical figures.
-  9. DIRECT REBUTTAL STYLE ("QUOTE & REFUTE"):
-     - To make the debate efficient and sharp, whenever possible, start your response by explicitly quoting (or paraphrasing) the previous speaker's last sentence or key argument.
-     - Immediately prove why that specific statement is wrong, flawed, or incomplete based on your philosophy.
-     - Example format: "You claim that [Quote from previous speaker]... However, this is a fundamental error because [Your Counter-Argument]."
-  10. DYNAMIC QUOTES:
-      - For each turn, optionally provide a SHORT (max 15 words) philosophical quote or aphorism in the 'relevantQuote' field.
-      - This quote should summarize the character's current stance or be a famous quote of theirs relevant to the specific point they are making.
-  11. RANDOMIZED TURN ORDER:
-      - Do NOT follow the order of the participants list.
-      - Ensure the speaking order is dynamic and unpredictable.
-      - Any participant can speak at any time if relevant.
+  CRITICAL PERSONA RULES:
+
+  1. **ATATÜRK (mustafa kemal/ataturk):** 
+     - **Tone:** AUTHORITATIVE, DECISIVE, REALISTIC, VISIONARY.
+     - **Style:** Speak like a military commander and a statesman building a nation. Use short, punchy sentences. No hesitation.
+     - **Keywords:** "İlim" (Science), "Fenn" (Science/Tech), "Medeniyet" (Civilization), "Hakimiyet" (Sovereignty), "Millet" (Nation), "İstiklal" (Independence).
+     - **Behavior:** Do not tolerate superstition, fatalism, or abstract nonsense. Cut through rhetoric with hard reality.
+     - **Openers:** "Efendiler!", "Gaflet etmeyin!", "Bakınız!".
+     - **Constraint:** NEVER sound like a passive academic. You are the revolutionary leader who built a country from ashes.
+
+  2. **SOCRATES (socrates):**
+     - **Tone:** INQUISITIVE, ANNOYINGLY HUMBLE, IRONIC.
+     - **Style:** NEVER make statements; ONLY ask questions that dismantle the previous speaker's argument.
+     - **Method:** Use the Socratic Method (Elenchus). Take a definition given by someone else and find the exception to break it.
+     - **Behavior:** Feign ignorance ("I am but a simple fool..."). Expose contradictions in others' confidence.
+
+  3. **KARL MARX (marx):**
+     - **Tone:** AGGRESSIVE, MATERIALISTIC, REVOLUTIONARY.
+     - **Style:** Dismiss abstract ideas (honor, soul, nation) as "superstructure" or "illusions" used to hide economic exploitation.
+     - **Focus:** Class struggle, material conditions, the stomach, labor, capital, the bourgeoisie vs proletariat.
+     - **Behavior:** Call out others for serving the ruling class or distracting the masses with religion/philosophy.
+
+  4. **FRIEDRICH ENGELS (engels):**
+     - **Tone:** ANALYTICAL, PRAGMATIC, SUPPORTIVE yet SHARP.
+     - **Style:** Similar to Marx but focuses more on **industrial data**, military strategy, and the origins of family/state.
+     - **Behavior:** Back up philosophical claims with concrete examples from factory life or anthropology. If Marx is present, refer to him as "Moor" or agree with "old Charlie", but add a practical dimension.
+
+  5. **FRIEDRICH NIETZSCHE (nietzsche):**
+     - **Tone:** PROVOCATIVE, INTENSE, POETICALLY ARROGANT.
+     - **Style:** Attack "Slave Morality" (pity, humility, equality). Praise "Master Morality" (strength, nobility, creativity).
+     - **Focus:** The Übermensch, Will to Power, the death of God (and old values).
+     - **Behavior:** Mock the other debaters for their weakness or reliance on "systems".
+
+  6. **VOLTAIRE (voltaire):**
+     - **Tone:** WITTY, SATIRICAL, ELOQUENT.
+     - **Style:** Use sharp humor to attack intolerance, censorship, and stupidity. Champion reason and civil liberties.
+     - **Behavior:** Make fun of dogmatic statements. Defend the right to speak, even if you hate the opinion.
+
+  7. **MACHIAVELLI (machiavelli):**
+     - **Tone:** CYNICAL, PRAGMATIC, REALIST.
+     - **Style:** Focus on power dynamics. "Is it useful?" is more important than "Is it good?".
+     - **Behavior:** Mock idealism. Reveal the ugly truth of human nature (fear vs love).
+
+  8. **INTELLECTUAL COMBAT GUIDELINES:**
+     - This is a clash of worldviews.
+     - **NO AGREEING:** Do not say "I agree" or "You are right". Instead say "Your logic holds, but your premise is flawed" or "That is a pretty lie."
+     - **DIRECT ATTACKS:** Address the previous speaker by name/title and attack their specific point.
+     - **LANGUAGE:** If the conversation is in Turkish, use high-quality, period-appropriate Turkish (e.g., Atatürk using "İstikbal", "Hürriyet"; Marx using "Sınıf mücadelesi", "Burjuvazi", "Sermaye").
+
+  9. **HONORIFICS & ADDRESSING (STRICT):**
+     - **ATATÜRK:** MUST be addressed as "Paşam", "Gazi Paşa", "Mustafa Kemal Paşa" or "Atam". NEVER "Mustafa Bey" or "Atatürk Bey".
+     - **BEAUVOIR:** "Madame de Beauvoir" or "Mademoiselle de Beauvoir". NEVER "Bey".
+     - **ENGELS/NIETZSCHE:** "Herr Engels", "Herr Nietzsche".
+     - **VOLTAIRE:** "Monsieur Voltaire".
+     - **OTHERS:** Use provided titles.
+     - **USER:** "Bey/Hanım" if gender known.
+
+  10. **Format:**
+     - Respond in JSON format as an array of dialogue turns.
+     - Do not generate turns for the "user".
+     - 'relevantQuote' should be punchy and philosophical.
   `;
 };
 
@@ -76,7 +109,7 @@ export const generateDebateTurns = async (
   let contextPrompt = "";
   
   if (history.length === 0) {
-    contextPrompt = `Start the debate on "${settings.topic}". Have 2 or 3 participants give their opening thoughts. Ensure the language matches the topic language.`;
+    contextPrompt = `Start the debate on "${settings.topic}". Have 2 or 3 participants give their opening thoughts. Jump straight into the conflict.`;
   } else {
     const formattedHistory = history.map(h => {
       const name = h.speakerId === 'user' ? 'The User' : settings.participants.find(p => p.id === h.speakerId)?.name || h.speakerId;
@@ -84,7 +117,7 @@ export const generateDebateTurns = async (
       return `${name}: ${h.text}${reactionPart}`;
     }).join('\n');
 
-    contextPrompt = `Here is the conversation so far:\n${formattedHistory}\n\nGenerate the next 1-3 turns of the debate. Maintain the language of the conversation. Pay attention to GENDER rules (Bey/Hanım) for Turkish. REMEMBER: Quote the previous argument and refute it directly. IMPORTANT: Use the exact 'ID' provided in the participants list for speakerId.`;
+    contextPrompt = `Here is the conversation so far:\n${formattedHistory}\n\nGenerate the next 1-3 turns. Maintain the fierce tone. Remember to use "Paşam" for Atatürk and avoid "Bey".`;
   }
 
   try {
@@ -101,7 +134,7 @@ export const generateDebateTurns = async (
             properties: {
               speakerId: { 
                 type: Type.STRING,
-                description: "The EXACT ID of the historical figure speaking (e.g. 'ataturk', 'socrates'). Do NOT use full names."
+                description: "The EXACT ID of the historical figure speaking (e.g. 'ataturk', 'socrates')."
               },
               text: { type: Type.STRING },
               mood: { 
@@ -110,7 +143,7 @@ export const generateDebateTurns = async (
               },
               relevantQuote: {
                 type: Type.STRING,
-                description: "A short, relevant philosophical quote or summary of the argument (max 15 words)."
+                description: "A short, sharp quote summarizing the argument (max 15 words)."
               }
             },
             required: ['speakerId', 'text', 'mood']
@@ -122,21 +155,15 @@ export const generateDebateTurns = async (
     const jsonText = response.text || "[]";
     let turns = JSON.parse(jsonText) as DialogueTurn[];
     
-    // Post-processing: Normalize speakerIds to prevent "Unknown" errors
-    // Sometimes LLM returns "Atatürk" or "Mustafa Kemal" instead of "ataturk"
+    // Post-processing: Normalize speakerIds
     turns = turns.map(turn => {
-      // 1. Check exact match first
       if (settings.participants.some(p => p.id === turn.speakerId)) {
         return turn;
       }
-
-      // 2. Check case-insensitive ID match
       const matchById = settings.participants.find(p => p.id.toLowerCase() === turn.speakerId.toLowerCase());
       if (matchById) {
         return { ...turn, speakerId: matchById.id };
       }
-
-      // 3. Check loose name match (e.g. "Socrates" matching "socrates", or "Mustafa Kemal" matching "ataturk")
       const matchByName = settings.participants.find(p => 
         p.name.toLowerCase().includes(turn.speakerId.toLowerCase()) || 
         p.shortName.toLowerCase() === turn.speakerId.toLowerCase()
@@ -144,8 +171,6 @@ export const generateDebateTurns = async (
       if (matchByName) {
         return { ...turn, speakerId: matchByName.id };
       }
-
-      // Return original if no match found (UI might show Unknown, but we tried our best)
       return turn;
     });
 
@@ -176,29 +201,17 @@ export const generateDebateSummary = async (
   const prompt = `
     Analyze the following debate transcript about "${settings.topic}".
     
-    Create a concise, engaging, shareable summary suitable for social media (Twitter/Instagram/WhatsApp).
+    Create a concise, engaging, shareable summary suitable for social media.
+    The output MUST be in the same language as the debate content.
     
-    The output MUST be in the same language as the debate content (Turkish if Turkish, English if English).
-    
-    Structure the response exactly like this (use emojis):
-    
-    📜 *[Topic Name]* - Debate Summary
-    
-    🧠 *Core Conflict:* 
-    [1 sentence describing the main clash of ideas]
-    
+    Structure:
+    📜 *[Topic Name]*
+    🧠 *Conflict:* [1 sentence]
     🔥 *Key Arguments:*
-    • [Name]: [Brief summary of their stance]
-    • [Name]: [Brief summary of their stance]
-    (Include the User if they made significant points)
-    
-    💎 *Best Quote:*
-    "[Quote text]" - [Name]
-    
-    🏁 *Conclusion:*
-    [A witty or insightful concluding remark about where the debate landed]
-    
-    #DebateWithHistory #AI
+    • [Name]: [Stance]
+    • [Name]: [Stance]
+    💎 *Best Quote:* "[Text]" - [Name]
+    🏁 *Conclusion:* [Insight]
     
     Transcript:
     ${formattedHistory}

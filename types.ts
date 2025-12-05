@@ -14,6 +14,7 @@ export interface HistoricalFigure {
   era: string;
   philosophy: string;
   quotes: string[];
+  titles: string[]; // Proper honorifics to be used by others (e.g. "Paşam", "Mevlana")
 }
 
 export interface DialogueTurn {

@@ -15,9 +15,9 @@ interface DebateArenaProps {
 // Map characters to specific Gemini TTS voices
 const VOICE_MAP: Record<string, string> = {
   ataturk: 'Fenrir', // Strong, authoritative
-  rumi: 'Zephyr', // Soft, poetic, spiritual
-  aquinas: 'Charon', // Deep, theological, heavy
-  maimonides: 'Fenrir', // Strong, legalistic
+  engels: 'Charon', // Intellectual, firm
+  nietzsche: 'Fenrir', // Intense
+  voltaire: 'Zephyr', // Witty, lighter
   socrates: 'Charon', // Deep, old/wise
   marx: 'Puck', // Energetic
   churchill: 'Fenrir',
@@ -26,6 +26,104 @@ const VOICE_MAP: Record<string, string> = {
   machiavelli: 'Puck',
   davinci: 'Zephyr', // Soft/Intellectual
   user: 'Zephyr' 
+};
+
+// Map characters to Sound Effects
+const SFX_MAP: Record<string, 'drum' | 'chime' | 'paper' | 'tech'> = {
+  ataturk: 'drum',
+  churchill: 'drum',
+  nietzsche: 'drum',
+  socrates: 'paper',
+  marx: 'paper',
+  engels: 'paper',
+  voltaire: 'paper',
+  curie: 'paper',
+  beauvoir: 'paper',
+  machiavelli: 'paper',
+  davinci: 'paper',
+  user: 'tech'
+};
+
+// Synthesize subtle sound effects using Web Audio API
+const playPersonaSound = (ctx: AudioContext, type: 'drum' | 'chime' | 'paper' | 'tech') => {
+  const t = ctx.currentTime;
+  
+  if (type === 'drum') {
+    // Distant low thud
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(100, t);
+    osc.frequency.exponentialRampToValueAtTime(40, t + 0.3);
+    
+    gain.gain.setValueAtTime(0.2, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+    
+    osc.start(t);
+    osc.stop(t + 0.35);
+
+  } else if (type === 'chime') {
+    // Soft spiritual bell
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(523.25, t); // C5
+    
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.05, t + 0.05); // Very soft
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 2.0);
+    
+    osc.start(t);
+    osc.stop(t + 2.0);
+
+  } else if (type === 'paper') {
+     // Parchment rustle (Filtered Noise)
+     const bufferSize = ctx.sampleRate * 0.5; 
+     const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+     const data = buffer.getChannelData(0);
+     for (let i = 0; i < bufferSize; i++) {
+       data[i] = Math.random() * 2 - 1;
+     }
+     const noise = ctx.createBufferSource();
+     noise.buffer = buffer;
+     
+     const filter = ctx.createBiquadFilter();
+     filter.type = 'lowpass';
+     filter.frequency.setValueAtTime(600, t);
+     filter.frequency.linearRampToValueAtTime(1000, t + 0.3);
+
+     const gain = ctx.createGain();
+     gain.gain.setValueAtTime(0.08, t);
+     gain.gain.linearRampToValueAtTime(0, t + 0.3);
+     
+     noise.connect(filter);
+     filter.connect(gain);
+     gain.connect(ctx.destination);
+     noise.start(t);
+
+  } else if (type === 'tech') {
+    // Modern user blip
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, t);
+    osc.frequency.exponentialRampToValueAtTime(1200, t + 0.1);
+    
+    gain.gain.setValueAtTime(0.03, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+    
+    osc.start(t);
+    osc.stop(t + 0.15);
+  }
 };
 
 export const DebateArena: React.FC<DebateArenaProps> = ({ 
@@ -43,6 +141,7 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   const [playingMsgId, setPlayingMsgId] = useState<string | null>(null);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
   const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [sfxEnabled, setSfxEnabled] = useState(true);
   
   // Summary/Share State
   const [showSummaryModal, setShowSummaryModal] = useState(false);
@@ -199,6 +298,12 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
         await audioContext.resume();
       }
 
+      // Play SFX CUE if enabled
+      if (sfxEnabled) {
+        const sfxType = SFX_MAP[msg.speakerId] || (msg.speakerId === 'user' ? 'tech' : 'paper');
+        playPersonaSound(audioContext, sfxType);
+      }
+
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(audioContext.destination);
@@ -214,7 +319,7 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
       };
 
       currentSourceRef.current = source;
-      source.start();
+      source.start(audioContext.currentTime + 0.1); // Small delay to let SFX start first
 
     } catch (error) {
       if (reqId === playbackReqRef.current) {
@@ -348,6 +453,24 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
           <h2 className="text-xl font-serif text-amber-500 truncate">{settings.topic}</h2>
           
           <div className="flex gap-2 ml-auto">
+            
+            {/* SFX Toggle */}
+            <button
+               onClick={() => setSfxEnabled(!sfxEnabled)}
+               className={`flex items-center justify-center w-8 h-8 rounded-full transition-colors ${sfxEnabled ? 'text-amber-500 bg-amber-900/20' : 'text-gray-600 hover:text-gray-400'}`}
+               title={sfxEnabled ? "SFX On" : "SFX Off"}
+             >
+               {sfxEnabled ? (
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                   <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" />
+                 </svg>
+               ) : (
+                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                   <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
+                 </svg>
+               )}
+            </button>
+
             {/* Global Play Button */}
             {messages.length > 0 && (
               <button 
