@@ -111,6 +111,18 @@ const App: React.FC = () => {
     }
   };
 
+  const handleReaction = (msgId: string, reaction: 'Agree' | 'Disagree' | 'Interesting') => {
+    setMessages(prev => prev.map(msg => {
+      if (msg.id !== msgId) return msg;
+      
+      // Toggle logic
+      const isSame = msg.userReaction === reaction;
+      const newReaction = isSame ? undefined : reaction;
+      
+      return { ...msg, userReaction: newReaction };
+    }));
+  };
+
   const handleRestart = () => {
     setStage('setup');
     setMessages([]);
@@ -131,6 +143,7 @@ const App: React.FC = () => {
           isThinking={isThinking}
           onSend={handleSend}
           onRestart={handleRestart}
+          onReaction={handleReaction}
         />
       )}
     </div>

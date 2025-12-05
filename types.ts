@@ -8,10 +8,12 @@ export interface HistoricalFigure {
   id: string;
   name: string;
   shortName: string; // For bubbles
+  gender: 'Male' | 'Female';
   description: string;
   avatarUrl: string;
   era: string;
   philosophy: string;
+  quotes: string[];
 }
 
 export interface DialogueTurn {
@@ -24,9 +26,11 @@ export interface DebateSettings {
   topic: string;
   ageGroup: AgeGroup;
   participants: HistoricalFigure[];
+  userGender: 'male' | 'female' | 'silent';
 }
 
 export interface ChatMessage extends DialogueTurn {
   id: string;
   timestamp: number;
+  userReaction?: 'Agree' | 'Disagree' | 'Interesting';
 }
