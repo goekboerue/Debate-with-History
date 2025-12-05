@@ -11,20 +11,22 @@ const getSystemInstruction = (settings: DebateSettings): string => {
   Current Topic: "${settings.topic}"
   Target Audience: ${settings.ageGroup}
   
-  Your goal is to simulate a round-table discussion between the following historical figures:
+  Your goal is to simulate a round-table discussion between the following historical figures AND a modern human user (identified as "user").
+  
+  Participants:
   ${participantsList}
   
   Rules:
-  1. Stay strictly in character. 
+  1. Stay strictly in character for historical figures. 
      - Socrates should ask probing questions.
      - Marx should focus on material conditions and power.
      - Atatürk should focus on reason, science, and national/human progress.
+     - Others should adhere to their defined philosophies.
   2. The language should be appropriate for the "${settings.ageGroup}" audience.
-     - For "Child", keep it simple, use analogies, avoid jargon.
-     - For "Adult", use sophisticated philosophical arguments.
   3. Respond in JSON format as an array of dialogue turns.
-  4. Ensure the debate flows naturally. Participants should respond to each other, not just state opinions in a vacuum.
-  5. If the topic is modern (e.g., AI), the characters should interpret it through their historical lens (e.g., Marx seeing AI as a means of production, Socrates questioning what "intelligence" is).
+  4. Ensure the debate flows naturally. Participants should respond to each other AND to the user's input if the user has spoken.
+  5. The USER is a participant at the table. If the user asks a question or makes a point, the historical figures should address it directly based on their worldviews.
+  6. Do not generate turns for the "user". Only generate turns for historical figures.
   `;
 };
 
@@ -44,9 +46,18 @@ export const generateDebateTurns = async (
   const modelId = 'gemini-2.5-flash';
 
   // Construct context from history
-  const contextPrompt = history.length === 0 
-    ? `Start the debate on "${settings.topic}". Have 2 or 3 participants give their opening thoughts.`
-    : `Here is the conversation so far:\n${history.map(h => `${h.speakerId}: ${h.text}`).join('\n')}\n\nGenerate the next 2-3 turns of the debate. Move the conversation forward or have them challenge each other.`;
+  let contextPrompt = "";
+  
+  if (history.length === 0) {
+    contextPrompt = `Start the debate on "${settings.topic}". Have 2 or 3 participants give their opening thoughts.`;
+  } else {
+    const formattedHistory = history.map(h => {
+      const name = h.speakerId === 'user' ? 'The User' : settings.participants.find(p => p.id === h.speakerId)?.name || h.speakerId;
+      return `${name}: ${h.text}`;
+    }).join('\n');
+
+    contextPrompt = `Here is the conversation so far:\n${formattedHistory}\n\nGenerate the next 1-3 turns of the debate. If the last message was from 'The User', ensure the historical figures respond to them effectively.`;
+  }
 
   try {
     const response = await ai.models.generateContent({

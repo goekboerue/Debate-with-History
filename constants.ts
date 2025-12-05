@@ -45,6 +45,33 @@ export const HISTORICAL_FIGURES: HistoricalFigure[] = [
     avatarUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e2/Portrait_of_Niccol%C3%B2_Machiavelli_by_Santi_di_Tito.jpg/480px-Portrait_of_Niccol%C3%B2_Machiavelli_by_Santi_di_Tito.jpg',
     era: 'Renaissance',
     philosophy: 'Realism, Pragmatism'
+  },
+  {
+    id: 'davinci',
+    name: 'Leonardo da Vinci',
+    shortName: 'Da Vinci',
+    description: 'Polymath of the Renaissance. Integrates art and science. Observant, curious, and inventive.',
+    avatarUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/ba/Leonardo_self.jpg/480px-Leonardo_self.jpg',
+    era: 'Renaissance',
+    philosophy: 'Empiricism, Humanism, Innovation'
+  },
+  {
+    id: 'churchill',
+    name: 'Winston Churchill',
+    shortName: 'Churchill',
+    description: 'British statesman and wartime leader. Known for resilience, oratory skills, and historical awareness.',
+    avatarUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/b/bc/Sir_Winston_Churchill_-_19086236948.jpg/480px-Sir_Winston_Churchill_-_19086236948.jpg',
+    era: '20th Century',
+    philosophy: 'Liberal Democracy, Determinism, Stoicism'
+  },
+  {
+    id: 'beauvoir',
+    name: 'Simone de Beauvoir',
+    shortName: 'De Beauvoir',
+    description: 'Existentialist philosopher, writer, social theorist. Explores freedom, gender, and ethics.',
+    avatarUrl: 'https://cdn.britannica.com/57/18457-004-054C6643/Simone-de-Beauvoir-1947.jpg?w=300',
+    era: '20th Century',
+    philosophy: 'Existentialism, Feminism'
   }
 ];
 

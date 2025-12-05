@@ -13,20 +13,30 @@ const App: React.FC = () => {
   const handleStart = (newSettings: DebateSettings) => {
     setSettings(newSettings);
     setStage('debating');
-    // We don't auto-start the call here to give user time to see the arena, 
-    // but the Arena component shows a "Begin" button.
   };
 
-  const handleNextTurn = async () => {
+  const handleSend = async (text: string) => {
     if (!settings) return;
+
+    // Create a temporary version of messages to send to API
+    let updatedMessages = [...messages];
+
+    // If user provided text, add it immediately to UI and history
+    if (text.trim()) {
+      const userMsg: ChatMessage = {
+        id: Date.now().toString(),
+        timestamp: Date.now(),
+        speakerId: 'user',
+        text: text.trim(),
+        mood: 'neutral' // User mood isn't really displayed
+      };
+      updatedMessages.push(userMsg);
+      setMessages(updatedMessages);
+    }
 
     setIsThinking(true);
     try {
-      const turns = await generateDebateTurns(settings, messages);
-      
-      // Add turns one by one with a small artificial delay for better UX flow, 
-      // or just add them all. Adding all at once is safer for state simplicity 
-      // but we need to map them to ChatMessages.
+      const turns = await generateDebateTurns(settings, updatedMessages);
       
       const newMessages: ChatMessage[] = turns.map((turn, index) => ({
         ...turn,
@@ -61,7 +71,7 @@ const App: React.FC = () => {
           settings={settings}
           messages={messages}
           isThinking={isThinking}
-          onNextTurn={handleNextTurn}
+          onSend={handleSend}
           onRestart={handleRestart}
         />
       )}
