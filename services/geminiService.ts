@@ -1,9 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { DebateSettings, DialogueTurn, HistoricalFigure, ChatMessage } from '../types';
 
-const apiKey = process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
-
 const getSystemInstruction = (settings: DebateSettings): string => {
   const participantsList = settings.participants.map(p => 
     `${p.name} (Philosophy: ${p.philosophy}, Personality: ${p.description})`
@@ -35,11 +32,15 @@ export const generateDebateTurns = async (
   settings: DebateSettings,
   history: ChatMessage[]
 ): Promise<DialogueTurn[]> => {
+  // Initialize AI client here to pick up the latest process.env.API_KEY
+  const apiKey = process.env.API_KEY;
+  
   if (!apiKey) {
     console.error("No API Key provided");
-    return [{ speakerId: 'system', text: 'Error: API Key missing.', mood: 'neutral' }];
+    throw new Error("API Key is missing. Please configure 'API_KEY' in your Vercel project settings or environment variables.");
   }
 
+  const ai = new GoogleGenAI({ apiKey });
   const modelId = 'gemini-2.5-flash';
 
   // Construct context from history

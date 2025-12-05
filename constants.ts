@@ -6,7 +6,7 @@ export const HISTORICAL_FIGURES: HistoricalFigure[] = [
     name: 'Mustafa Kemal Atatürk',
     shortName: 'Atatürk',
     description: 'Founder of modern Turkey, visionary statesman, emphasis on science, reason, and progress.',
-    avatarUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/1c/Mustafa_Kemal_Atat%C3%BCrk.jpg/480px-Mustafa_Kemal_Atat%C3%BCrk.jpg',
+    avatarUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Mustafa_Kemal_Atat%C3%BCrk_in_1923.jpg/480px-Mustafa_Kemal_Atat%C3%BCrk_in_1923.jpg',
     era: '20th Century',
     philosophy: 'Rationalism, Secularism, Progressivism'
   },

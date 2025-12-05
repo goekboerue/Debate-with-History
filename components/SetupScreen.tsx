@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AgeGroup, DebateSettings, HistoricalFigure } from '../types';
+import { AgeGroup, DebateSettings } from '../types';
 import { HISTORICAL_FIGURES, SUGGESTED_TOPICS } from '../constants';
 
 interface SetupScreenProps {
