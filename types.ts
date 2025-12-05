@@ -20,6 +20,7 @@ export interface DialogueTurn {
   speakerId: string;
   text: string;
   mood: 'neutral' | 'passionate' | 'thoughtful' | 'angry' | 'amused';
+  relevantQuote?: string;
 }
 
 export interface DebateSettings {

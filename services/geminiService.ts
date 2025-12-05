@@ -2,8 +2,11 @@ import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { DebateSettings, DialogueTurn, HistoricalFigure, ChatMessage } from '../types';
 
 const getSystemInstruction = (settings: DebateSettings): string => {
-  const participantsList = settings.participants.map(p => 
-    `${p.name} [Gender: ${p.gender}] (Philosophy: ${p.philosophy}, Personality: ${p.description})`
+  // Shuffle participants to avoid order bias in the LLM's response
+  const shuffledParticipants = [...settings.participants].sort(() => Math.random() - 0.5);
+
+  const participantsList = shuffledParticipants.map(p => 
+    `${p.name} [Gender: ${p.gender}] (ID: ${p.id}) (Philosophy: ${p.philosophy}, Personality: ${p.description})`
   ).join('\n');
 
   return `You are a simulator for an educational app called "Debate with History".
@@ -44,6 +47,13 @@ const getSystemInstruction = (settings: DebateSettings): string => {
      - To make the debate efficient and sharp, whenever possible, start your response by explicitly quoting (or paraphrasing) the previous speaker's last sentence or key argument.
      - Immediately prove why that specific statement is wrong, flawed, or incomplete based on your philosophy.
      - Example format: "You claim that [Quote from previous speaker]... However, this is a fundamental error because [Your Counter-Argument]."
+  10. DYNAMIC QUOTES:
+      - For each turn, optionally provide a SHORT (max 15 words) philosophical quote or aphorism in the 'relevantQuote' field.
+      - This quote should summarize the character's current stance or be a famous quote of theirs relevant to the specific point they are making.
+  11. RANDOMIZED TURN ORDER:
+      - Do NOT follow the order of the participants list.
+      - Ensure the speaking order is dynamic and unpredictable.
+      - Any participant can speak at any time if relevant.
   `;
 };
 
@@ -74,7 +84,7 @@ export const generateDebateTurns = async (
       return `${name}: ${h.text}${reactionPart}`;
     }).join('\n');
 
-    contextPrompt = `Here is the conversation so far:\n${formattedHistory}\n\nGenerate the next 1-3 turns of the debate. Maintain the language of the conversation. Pay attention to GENDER rules (Bey/Hanım) for Turkish. REMEMBER: Quote the previous argument and refute it directly.`;
+    contextPrompt = `Here is the conversation so far:\n${formattedHistory}\n\nGenerate the next 1-3 turns of the debate. Maintain the language of the conversation. Pay attention to GENDER rules (Bey/Hanım) for Turkish. REMEMBER: Quote the previous argument and refute it directly. IMPORTANT: Use the exact 'ID' provided in the participants list for speakerId.`;
   }
 
   try {
@@ -91,12 +101,16 @@ export const generateDebateTurns = async (
             properties: {
               speakerId: { 
                 type: Type.STRING,
-                description: "The ID of the historical figure speaking (must match one of: " + settings.participants.map(p => p.id).join(', ') + ")"
+                description: "The EXACT ID of the historical figure speaking (e.g. 'ataturk', 'socrates'). Do NOT use full names."
               },
               text: { type: Type.STRING },
               mood: { 
                 type: Type.STRING, 
                 enum: ['neutral', 'passionate', 'thoughtful', 'angry', 'amused'] 
+              },
+              relevantQuote: {
+                type: Type.STRING,
+                description: "A short, relevant philosophical quote or summary of the argument (max 15 words)."
               }
             },
             required: ['speakerId', 'text', 'mood']
@@ -106,7 +120,35 @@ export const generateDebateTurns = async (
     });
 
     const jsonText = response.text || "[]";
-    const turns = JSON.parse(jsonText) as DialogueTurn[];
+    let turns = JSON.parse(jsonText) as DialogueTurn[];
+    
+    // Post-processing: Normalize speakerIds to prevent "Unknown" errors
+    // Sometimes LLM returns "Atatürk" or "Mustafa Kemal" instead of "ataturk"
+    turns = turns.map(turn => {
+      // 1. Check exact match first
+      if (settings.participants.some(p => p.id === turn.speakerId)) {
+        return turn;
+      }
+
+      // 2. Check case-insensitive ID match
+      const matchById = settings.participants.find(p => p.id.toLowerCase() === turn.speakerId.toLowerCase());
+      if (matchById) {
+        return { ...turn, speakerId: matchById.id };
+      }
+
+      // 3. Check loose name match (e.g. "Socrates" matching "socrates", or "Mustafa Kemal" matching "ataturk")
+      const matchByName = settings.participants.find(p => 
+        p.name.toLowerCase().includes(turn.speakerId.toLowerCase()) || 
+        p.shortName.toLowerCase() === turn.speakerId.toLowerCase()
+      );
+      if (matchByName) {
+        return { ...turn, speakerId: matchByName.id };
+      }
+
+      // Return original if no match found (UI might show Unknown, but we tried our best)
+      return turn;
+    });
+
     return turns;
 
   } catch (error) {

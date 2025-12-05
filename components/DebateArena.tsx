@@ -49,8 +49,10 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   const [summaryText, setSummaryText] = useState<string>('');
   const [showToast, setShowToast] = useState(false);
 
-  // Manual Focus State (Clicking avatars)
+  // Focus State
   const [manualFocusId, setManualFocusId] = useState<string | null>(null);
+  // Instead of just speaker ID, we track message ID to get specific quotes
+  const [hoveredMessageId, setHoveredMessageId] = useState<string | null>(null);
   
   // Refs for State in Callbacks
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -99,7 +101,7 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
   }, []);
 
   // Generate random quote indices for each participant whenever message count changes.
-  // This ensures variety as the conversation progresses.
+  // This ensures variety as the conversation progresses, used as fallback.
   const quoteIndices = useMemo(() => {
     const map: Record<string, number> = {};
     settings.participants.forEach(p => {
@@ -276,12 +278,45 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
     ? messages.find(m => m.id === playingMsgId)?.speakerId 
     : null;
 
+  // Determine hovered speaker from hovered message ID
+  const hoveredSpeakerId = hoveredMessageId 
+    ? messages.find(m => m.id === hoveredMessageId)?.speakerId 
+    : null;
+
   // Determine who is visually active (Last text message if no audio)
   const activeTextSpeakerId = messages.length > 0 ? messages[messages.length - 1].speakerId : null;
   
-  // The figure to highlight is the audio speaker if playing, otherwise the last texter OR manual selection
-  // Manual selection takes precedence for visual focus (scale/color), but audio indicators remain on speaker
-  const visualFocusId = manualFocusId || currentAudioSpeakerId || activeTextSpeakerId;
+  // Priority: Hover (Message) > Manual Click > Audio Playing > Last Text Message
+  const visualFocusId = hoveredSpeakerId || manualFocusId || currentAudioSpeakerId || activeTextSpeakerId;
+
+  // Helper to find the relevant quote to display
+  // Logic: 
+  // 1. If hovering a message, use that message's quote.
+  // 2. If playing audio, use the playing message's quote.
+  // 3. If showing last text speaker (and not playing), use last message's quote.
+  // 4. Fallback to generic quote from constants.
+  const getRelevantQuoteForParticipant = (participantId: string): string | undefined => {
+      let msg: ChatMessage | undefined;
+      
+      if (hoveredMessageId) {
+        msg = messages.find(m => m.id === hoveredMessageId && m.speakerId === participantId);
+      } else if (playingMsgId) {
+        msg = messages.find(m => m.id === playingMsgId && m.speakerId === participantId);
+      } else {
+        // Last message by this participant
+        // Reverse search for efficiency usually better, but array is small enough
+        msg = [...messages].reverse().find(m => m.speakerId === participantId);
+      }
+
+      if (msg && msg.relevantQuote) {
+        return msg.relevantQuote;
+      }
+      
+      // Fallback
+      const idx = quoteIndices[participantId] || 0;
+      const quotes = settings.participants.find(p => p.id === participantId)?.quotes || [];
+      return quotes.length > 0 ? quotes[idx] : undefined;
+  };
 
   // Calculate positions for round table
   const participants = settings.participants;
@@ -381,7 +416,8 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
               const isSpeakingAudio = currentAudioSpeakerId === participant.id;
               const hasFocus = visualFocusId === participant.id;
               const isManualFocus = manualFocusId === participant.id;
-              const quoteIndex = quoteIndices[participant.id] || 0;
+              
+              const relevantQuote = getRelevantQuoteForParticipant(participant.id);
               
               return (
                 <div 
@@ -427,10 +463,10 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
                     )}
 
                     {/* Character Quote Bubble (Only if focussed and not showing generic speech dots AND not manually focused) */}
-                    {hasFocus && !isManualFocus && !isSpeakingAudio && participant.quotes.length > 0 && (
+                    {hasFocus && !isManualFocus && !isSpeakingAudio && relevantQuote && (
                        <div className="absolute -top-24 left-1/2 transform -translate-x-1/2 w-48 bg-neutral-800/90 backdrop-blur-sm border border-amber-500/30 text-amber-100 p-3 rounded-lg shadow-xl z-50 text-center animate-fade-in pointer-events-none">
                           <p className="text-[10px] md:text-xs font-serif italic leading-tight">
-                            "{participant.quotes[quoteIndex]}"
+                            "{relevantQuote}"
                           </p>
                           <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-neutral-800 border-r border-b border-amber-500/30 rotate-45"></div>
                        </div>
@@ -474,9 +510,19 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
             
             {messages.map((msg, idx) => {
               const isUser = msg.speakerId === 'user';
-              const speaker = isUser 
+              
+              // Robust speaker lookup with fallback for display
+              let speaker = isUser 
                 ? { shortName: 'You', id: 'user' } 
                 : settings.participants.find(p => p.id === msg.speakerId);
+              
+              if (!speaker && !isUser) {
+                  // Fallback: try finding by loose name match if ID failed (in case backend service didn't catch it)
+                  speaker = settings.participants.find(p => 
+                      p.name.toLowerCase().includes(msg.speakerId.toLowerCase()) ||
+                      p.shortName.toLowerCase() === msg.speakerId.toLowerCase()
+                  );
+              }
               
               const isPlaying = playingMsgId === msg.id;
 
@@ -484,6 +530,8 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
                 <div 
                   key={msg.id} 
                   id={`msg-${msg.id}`}
+                  onMouseEnter={() => !isUser && setHoveredMessageId(msg.id)}
+                  onMouseLeave={() => setHoveredMessageId(null)}
                   className={`animate-slide-up flex flex-col ${isUser ? 'items-end' : 'items-start'} transition-opacity duration-500 ${
                     playingMsgId && !isPlaying ? 'opacity-40' : 'opacity-100'
                   }`}
