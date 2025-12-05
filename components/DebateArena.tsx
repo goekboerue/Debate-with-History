@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { ChatMessage, DebateSettings, HistoricalFigure } from '../types';
 import { generateSpeech, generateDebateSummary } from '../services/geminiService';
+import { Logo } from './Logo';
 
 interface DebateArenaProps {
   settings: DebateSettings;
@@ -341,9 +342,12 @@ export const DebateArena: React.FC<DebateArenaProps> = ({
       {/* Header */}
       <header className="flex-none h-16 bg-neutral-900 border-b border-neutral-800 flex items-center justify-between px-6 z-10">
         <div className="flex items-center gap-4 min-w-0">
+          {/* Logo in Header */}
+          <Logo className="w-8 h-8 text-amber-500 shrink-0" />
+          
           <h2 className="text-xl font-serif text-amber-500 truncate">{settings.topic}</h2>
           
-          <div className="flex gap-2">
+          <div className="flex gap-2 ml-auto">
             {/* Global Play Button */}
             {messages.length > 0 && (
               <button 

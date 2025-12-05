@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { AgeGroup, DebateSettings, ChatMessage } from '../types';
 import { HISTORICAL_FIGURES, SUGGESTED_TOPICS, TOPIC_DESCRIPTIONS } from '../constants';
+import { Logo } from './Logo';
 
 interface SetupScreenProps {
   onStart: (settings: DebateSettings, messages?: ChatMessage[], sessionId?: string) => void;
@@ -90,7 +91,10 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStart }) => {
 
   return (
     <div className="max-w-4xl mx-auto p-6 md:p-12 animate-fade-in flex flex-col min-h-screen justify-center">
-      <header className="mb-10 text-center">
+      <header className="mb-10 text-center flex flex-col items-center">
+        <div className="mb-6 p-4 rounded-full bg-neutral-900 border border-neutral-800 shadow-2xl shadow-amber-900/10">
+           <Logo className="w-20 h-20 text-amber-500" />
+        </div>
         <h1 className="text-5xl font-bold mb-4 text-amber-500 serif-font">Debate with History</h1>
         <p className="text-gray-400 text-lg">Select a modern topic and invite history's greatest minds to the table.</p>
       </header>
