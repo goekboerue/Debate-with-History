@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { AgeGroup, DebateSettings } from '../types';
+import React, { useState, useEffect } from 'react';
+import { AgeGroup, DebateSettings, ChatMessage } from '../types';
 import { HISTORICAL_FIGURES, SUGGESTED_TOPICS } from '../constants';
 
 interface SetupScreenProps {
-  onStart: (settings: DebateSettings) => void;
+  onStart: (settings: DebateSettings, messages?: ChatMessage[], sessionId?: string) => void;
 }
 
 export const SetupScreen: React.FC<SetupScreenProps> = ({ onStart }) => {
@@ -11,6 +11,56 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStart }) => {
   const [customTopic, setCustomTopic] = useState('');
   const [ageGroup, setAgeGroup] = useState<AgeGroup>(AgeGroup.ADULT);
   const [selectedIds, setSelectedIds] = useState<string[]>(['ataturk', 'socrates', 'marx']);
+  const [history, setHistory] = useState<any[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('debate_history');
+      if (saved) {
+        setHistory(JSON.parse(saved));
+      }
+    } catch (e) {
+      console.error("Failed to load history", e);
+    }
+  }, []);
+
+  // Loads settings into the form but DOES NOT start the debate (Clone Settings)
+  const loadSettingsFromHistory = (e: React.MouseEvent, item: any) => {
+    e.stopPropagation();
+    if (SUGGESTED_TOPICS.includes(item.topic)) {
+      setTopic(item.topic);
+      setCustomTopic('');
+    } else {
+      setTopic(SUGGESTED_TOPICS[0]); 
+      setCustomTopic(item.topic);
+    }
+    setAgeGroup(item.ageGroup);
+    if (item.participants && Array.isArray(item.participants)) {
+      setSelectedIds(item.participants.map((p: any) => p.id));
+    }
+  };
+
+  // Resume the session immediately
+  const resumeSession = (item: any) => {
+    const sessionSettings: DebateSettings = {
+      topic: item.topic,
+      ageGroup: item.ageGroup,
+      participants: item.participants || []
+    };
+    onStart(sessionSettings, item.messages || [], item.id);
+  };
+
+  const deleteHistoryItem = (e: React.MouseEvent, index: number) => {
+    e.stopPropagation();
+    try {
+      const newHistory = [...history];
+      newHistory.splice(index, 1);
+      setHistory(newHistory);
+      localStorage.setItem('debate_history', JSON.stringify(newHistory));
+    } catch (err) {
+      console.error("Failed to delete item", err);
+    }
+  };
 
   const toggleCharacter = (id: string) => {
     if (selectedIds.includes(id)) {
@@ -24,7 +74,7 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStart }) => {
     }
   };
 
-  const handleStart = () => {
+  const handleStartNew = () => {
     const finalTopic = customTopic.trim() || topic;
     const participants = HISTORICAL_FIGURES.filter(f => selectedIds.includes(f.id));
     onStart({
@@ -138,8 +188,8 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStart }) => {
           </div>
         </div>
 
-        {/* Right Column: Preview / CTA */}
-        <div className="flex flex-col justify-center items-center text-center space-y-6">
+        {/* Right Column: Preview / CTA / History */}
+        <div className="flex flex-col justify-start items-center text-center space-y-6">
           <div className="w-full max-w-sm aspect-square bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-full border-4 border-neutral-800 shadow-2xl flex items-center justify-center relative p-8">
             <div className="absolute inset-4 border border-dashed border-neutral-700 rounded-full animate-spin-slow" style={{ animationDuration: '60s' }}></div>
             <p className="font-serif text-2xl italic text-gray-500">
@@ -148,12 +198,89 @@ export const SetupScreen: React.FC<SetupScreenProps> = ({ onStart }) => {
           </div>
           
           <button 
-            onClick={handleStart}
+            onClick={handleStartNew}
             disabled={selectedIds.length < 2 || (!topic && !customTopic)}
             className="w-full max-w-sm py-4 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-white font-bold rounded-xl shadow-lg transform transition hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
           >
             Enter the Chamber
           </button>
+
+          {/* History Section */}
+          {history.length > 0 && (
+            <div className="w-full max-w-sm mt-8 pt-6 border-t border-neutral-800">
+              <div className="flex justify-between items-center mb-4">
+                 <h3 className="text-gray-500 text-xs font-bold uppercase tracking-widest text-left">Recent Sessions</h3>
+                 {history.length > 0 && (
+                    <span className="text-[10px] text-gray-600 uppercase tracking-wider">{history.length} Saved</span>
+                 )}
+              </div>
+              <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                {history.map((item, idx) => (
+                  <div key={idx} className="flex gap-2 group w-full">
+                    <button 
+                      onClick={() => resumeSession(item)}
+                      className="flex-1 bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 p-3 rounded-lg flex items-center gap-3 transition-colors text-left"
+                    >
+                       <div className="flex -space-x-2 overflow-hidden flex-shrink-0">
+                          {item.participants.slice(0, 3).map((p: any) => (
+                             <img 
+                                key={p.id} 
+                                src={p.avatarUrl} 
+                                alt={p.name} 
+                                className="inline-block h-8 w-8 rounded-full ring-2 ring-neutral-900 object-cover grayscale group-hover:grayscale-0 transition-all" 
+                             />
+                          ))}
+                          {item.participants.length > 3 && (
+                             <div className="h-8 w-8 rounded-full bg-neutral-800 ring-2 ring-neutral-900 flex items-center justify-center text-[10px] text-gray-400">
+                                +{item.participants.length - 3}
+                             </div>
+                          )}
+                       </div>
+                       <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-gray-300 truncate group-hover:text-amber-500 transition-colors">
+                             {item.topic}
+                          </p>
+                          <div className="flex justify-between items-center">
+                            <p className="text-xs text-gray-600">
+                               {item.ageGroup}
+                            </p>
+                            {item.messages && item.messages.length > 0 && (
+                              <span className="text-[10px] text-amber-500/80 bg-amber-900/20 px-1.5 py-0.5 rounded">
+                                {item.messages.length} msgs
+                              </span>
+                            )}
+                          </div>
+                       </div>
+                    </button>
+                    
+                    <div className="flex flex-col gap-1">
+                      {/* Copy Settings Button */}
+                      <button
+                        onClick={(e) => loadSettingsFromHistory(e, item)}
+                        className="h-full flex-1 px-3 bg-neutral-900 hover:bg-blue-900/20 border border-neutral-800 hover:border-blue-900/50 text-gray-600 hover:text-blue-400 rounded-lg transition-colors flex items-center justify-center"
+                        title="Copy Settings (Start New)"
+                      >
+                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
+                         </svg>
+                      </button>
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={(e) => deleteHistoryItem(e, idx)}
+                        className="h-full flex-1 px-3 bg-neutral-900 hover:bg-red-900/20 border border-neutral-800 hover:border-red-900/50 text-gray-600 hover:text-red-500 rounded-lg transition-colors flex items-center justify-center"
+                        title="Delete Session"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

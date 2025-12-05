@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SetupScreen } from './components/SetupScreen';
 import { DebateArena } from './components/DebateArena';
 import { ChatMessage, DebateSettings } from './types';
@@ -9,10 +9,67 @@ const App: React.FC = () => {
   const [settings, setSettings] = useState<DebateSettings | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
-  const handleStart = (newSettings: DebateSettings) => {
+  // Auto-save history when messages change
+  useEffect(() => {
+    if (!sessionId || !settings || stage !== 'debating') return;
+
+    try {
+      const history = JSON.parse(localStorage.getItem('debate_history') || '[]');
+      const index = history.findIndex((h: any) => h.id === sessionId);
+
+      if (index !== -1) {
+        // Update existing session
+        history[index].messages = messages;
+        history[index].timestamp = Date.now();
+        
+        // Move to top
+        const updatedItem = history.splice(index, 1)[0];
+        history.unshift(updatedItem);
+      } else {
+        // Create new session entry if somehow missing (or first save)
+        const newItem = {
+          id: sessionId,
+          ...settings,
+          messages,
+          timestamp: Date.now()
+        };
+        history.unshift(newItem);
+      }
+
+      // Limit to 20
+      const trimmedHistory = history.slice(0, 20);
+      localStorage.setItem('debate_history', JSON.stringify(trimmedHistory));
+    } catch (e) {
+      console.warn("Failed to auto-save history", e);
+    }
+  }, [messages, sessionId, settings, stage]);
+
+  const handleStart = (newSettings: DebateSettings, initialMessages: ChatMessage[] = [], resumeId?: string) => {
+    const id = resumeId || Date.now().toString();
+    
+    setSessionId(id);
     setSettings(newSettings);
+    setMessages(initialMessages);
     setStage('debating');
+    
+    // If it's a completely new session, create the initial history entry immediately
+    if (!resumeId) {
+       try {
+         const history = JSON.parse(localStorage.getItem('debate_history') || '[]');
+         const newItem = {
+            id,
+            ...newSettings,
+            messages: [],
+            timestamp: Date.now()
+         };
+         const newHistory = [newItem, ...history].slice(0, 20);
+         localStorage.setItem('debate_history', JSON.stringify(newHistory));
+       } catch(e) {
+         console.warn("Failed to create initial history", e);
+       }
+    }
   };
 
   const handleSend = async (text: string) => {
@@ -58,6 +115,7 @@ const App: React.FC = () => {
     setStage('setup');
     setMessages([]);
     setSettings(null);
+    setSessionId(null);
   };
 
   return (
